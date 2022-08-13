@@ -1,3 +1,37 @@
+# avoid-fragmentation implementation for NSD
+
+This is an implementaion of [draft-ietf-dnsop-avoid-fragmentation](https://datatracker.ietf.org/doc/draft-ietf-dnsop-avoid-fragmentation/) (Fragmentation Avoidance in DNS) for NSD.
+
+## Notes
+ * Currently it works on Linux only due to getsockopt(IP_MTU) dependency.
+ * Avoid-fragmentation mode is enabled on IPv4/UDP sockets only, since NSD already limits maximum size of IPv6/UDP to 1280 bytes.
+
+## How to build
+```
+git clone https://github.com/hdais/nsd-avoid-fragmentation
+cd nsd-avoid-fragmentation
+aclocal && autoconf && autoheader
+./configure
+make
+make install
+```
+
+## Debugging
+
+Some debug messages available in verbose logging mode:
+```
+server:
+  verbose: 3
+```
+
+Debug messages examples:
+```
+nsd[9837]: notice: avoid-fragmentation mode enabled: forcing maximum IPv4/UDP message size to PMTU
+nsd[9847]: info: probe_pmtu: got pmtu to 192.0.2.1 (552 bytes): updating response maxlen from 1232 to 524
+```
+
+original README.md follows...
+
 # NSD
 
 [![Travis Build Status](https://travis-ci.org/NLnetLabs/nsd.svg?branch=master)](https://travis-ci.org/NLnetLabs/nsd)

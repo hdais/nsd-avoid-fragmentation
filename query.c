@@ -1498,6 +1498,52 @@ query_prepare_response(query_type *q)
 	FLAGS_SET(q->packet, flags);
 }
 
+
+/*
+ *  draft-ietf-dnsop-avoid-fragmentation.
+ *  Probe path mtu to requester address and limit bufsize (q->maxlen)
+ *  into pmtu - 20 (IPv4 hdr) - 8 (UDP hdr)
+ *
+ *  available only in Linux and enabled only for IPv4/UDP.
+ */
+
+void probe_pmtu(query_type *q)
+{
+#if defined(IP_MTU) && defined(linux)
+	int s, r, mtu=0;
+	size_t new_maxlen;
+	socklen_t slen = sizeof(int);
+	char a[128];
+
+	if (q->tcp || q->addr.ss_family != AF_INET) return;
+
+	addr2str(&q->addr, a, sizeof(a));
+
+	s = socket(AF_INET, SOCK_DGRAM, 0);
+	if (s == -1)return;
+
+	r = connect(s, (struct sockaddr *)&(q->addr), q->addrlen);
+	if (r == -1)return;
+
+	r = getsockopt(s, IPPROTO_IP, IP_MTU, &mtu, &slen);
+        if (r == -1)return;
+
+	if (mtu < 512 + 8 + 20) {
+		VERBOSITY(3,(LOG_INFO,
+			"probe_pmtu: got pmtu to %s (%d bytes), but too small",
+			a, mtu));
+		return;
+	}
+
+	new_maxlen = (mtu - 8 - 20 < q->maxlen)?(mtu - 8 - 20):(q->maxlen);
+	VERBOSITY(3,(LOG_INFO, "probe_pmtu: got pmtu to %s (%d bytes): "
+			"updating response maxlen from %ld to %ld",
+			a, mtu, q->maxlen, new_maxlen));
+	q->maxlen = new_maxlen;
+#endif /* IP_MTU && linux */
+	return;
+}
+
 /*
  * Processes the query.
  *
@@ -1662,6 +1708,9 @@ query_process(query_type *q, nsd_type *nsd, uint32_t *now_p)
 
 	if (q->edns.cookie_status == COOKIE_UNVERIFIED)
 		cookie_verify(q, nsd, now_p);
+
+	/* draft-ietf-dnsop-avoid-fragmentation */
+	probe_pmtu(q);
 
 	query_prepare_response(q);
 

@@ -1216,8 +1216,18 @@ open_udp_socket(struct nsd *nsd, struct nsd_socket *sock, int *reuseport_works)
 	} else
 #endif /* INET6 */
 	if(sock->addr.ai_family == AF_INET) {
+#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_DO) && defined(linux)
+		int mtudisc = IP_PMTUDISC_DO;
+		if( 0 == setsockopt(sock->s, IPPROTO_IP,
+			IP_MTU_DISCOVER, &mtudisc, sizeof(mtudisc))) {
+			log_msg(LOG_NOTICE, "avoid-fragmentation mode enabled: forcing maximum IPv4/UDP message size to PMTU");
+		} else {
+			log_msg(LOG_ERR, "avoid-fragmentation mode failed");
+		}
+#else
 		if(set_ipv4_no_pmtu_disc(sock) == -1)
 			return -1;
+#endif
 	}
 
 	/* Set socket to non-blocking. Otherwise, on operating systems
